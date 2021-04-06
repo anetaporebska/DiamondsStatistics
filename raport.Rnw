@@ -1,0 +1,579 @@
+\documentclass{article}
+%\usepackage{polski}
+% skomentowana dla MAC wersja {inputenc}
+ \usepackage[utf8]{inputenc}
+% \usepackage[T1]{fontenc}
+%\usepackage[cp1250]{inputenc}
+%\usepackage{polski}
+\usepackage{amssymb}
+\usepackage{color}
+\usepackage{amsmath}
+\usepackage{Sweave}
+\usepackage{enumerate}
+\usepackage{hyperref}
+
+
+\title{Porównanie cech sprzedawanych diamentów}
+\author{\textbf{402406, Aneta Porębska}, czwartek $14^{40}$\\ 
+\textit{AGH, Wydział Informatyki Elektroniki i Telekomunikacji}\\
+\textit{Rachunek prawdopodobieństwa i statystyka 2020/2021}}
+\date{Kraków, \today}
+
+
+\begin{document}
+\SweaveOpts{concordance=TRUE}
+\maketitle
+
+\textit{Ja, niżej podpisany(na) własnoręcznym podpisem deklaruję, że przygotowałem(łam) przedstawiony do oceny projekt samodzielnie i żadna jego część nie jest kopią pracy innej osoby.}
+\begin{flushright}
+{............................................}
+\end{flushright}
+
+\section{Streszczenie raportu}
+Raport powstał w oparciu o analizę danych dotyczących diamentów - ich ceny, rozmiarów i kształtu. 
+Wyznaczono i przeanalizowano podstawowe cechy rozkładu zmiennych, a także wygenerowano odpowiednie wykresy. Następnie 
+porównano rozklady zmiennych z rozkładem normalnym, w wyniku analizy tylko jedna ze zmiennych tylko jedna zmienna miała rozkład zbliżony do normalnego (zmienna 'depth').
+Po znormalizowaniu jej rozkładu, przetestowano kilka hipotez zerowych dla średniej.
+Dwie badane zmienne (x i y) okazły się mieć zgodne rozkłady, co przedstawiono za pomoca qqplot().
+W kolejnej części raportu zajęto się zależnościami między zmiennymi, wyznaczono macierze kowariancji i korelacji dla wszystkich zamiennych, a następnie dla wybranych par
+zmiennych przedstawiono ich zależności na wykresach. Dopasowano proste regresji dla zmiennych, których rozkład wskazywał na zależność liniową między zmiennymi, a także
+zbadano przedziały ufności (i ich długości) dla wybranych wartości zmiennych. 
+ 
+
+\newpage
+\section{Opis danych}
+Dane do projektu pochodzą ze strony \href{url}{\texttt{https://www.kaggle.com/shivam2503/diamonds}}. Dotyczą one ceny i wymiarów prawie 54000 diamentów.
+Zmienne analizowane w projekcie:
+\begin{itemize}
+\item price - cena diamentu w dolarach,
+\item carat - masa diamentu w karatach (1 karat = 0.2 g)
+\item depth - procentowa głębokość diamentu, stosunek wysokości do średniej szerokości
+\item table - szerokość szczytu diamentu w stosunku do największej szerokości diamentu
+\item x - długość diamentu (w milimetrach)
+\item y - szerokość diamentu (w milimetrach)
+\item z - głębokość (wysokość) diamentu (w milimetrach)
+\end{itemize}
+
+
+\section{Analiza danych}
+
+\subsection{Przygotowanie danych do analizy}
+
+W realizacji projektu niezbędne okzały się następujące biblioteki.
+
+<<>>=
+library(e1071)
+library(ggplot2)
+library(dplyr)
+library(hrbrthemes)
+library(GGally)
+library(nortest)
+library(MASS)
+@
+
+
+Pracę nad projektem rozpoczęto od wczytania danych do R, a następnie wybrania kolumn, których analizę planowano przeprowadzić. Nowo utworzone dane zapisano do pliku.
+
+
+<<>>=
+setwd("/home/aneta/Pulpit/Studia/Semestr_3/Prawdopodobieństwo i statystyka/projekt")
+data <- read.csv("diamonds.csv")
+data_set <- as.data.frame(cbind(data$carat, data$depth, data$table, data$price, data$x, data$y, data$z))
+colnames(data_set)[1]<-"carat"
+colnames(data_set)[2]<-"depth"
+colnames(data_set)[3]<-"table_var"
+colnames(data_set)[4]<-"price"
+colnames(data_set)[5]<-"x_corr"
+colnames(data_set)[6]<-"y_corr"
+colnames(data_set)[7]<-"z_corr"
+attach(data_set)
+write.csv(data_set,"/home/aneta/Pulpit/Studia/Semestr_3/Prawdopodobieństwo i statystyka/projekt/data_set.csv", row.names = TRUE)
+
+@
+
+
+
+
+
+
+\subsection{Wydobywanie podstawowych informacji z danych}
+
+Dla każdej zmiennej wyznaczono przedział wartości, medianę, średnią, kwantyle, odchylenie standardowe, a także kurtozę i współczynnik asymetrii.
+Następnie dla każdej z nich wygenerowano histogram oraz boxplot.
+
+
+\subsubsection {Zmienna 'price'}
+
+Analizę rozpoczęto od zmiennej 'price'.
+
+<<label=price_hist, fig=TRUE>>=
+hist(price, breaks = 50, main="Histogram for variable 'price' ", col="darkmagenta")
+@
+
+Na podstawie histogramu można zauważyć, że im większa cena diamentu tym rzadziej jest on kupowany.
+
+<<>>=
+range(price)
+median(price)
+mean(price)
+quantile(price, c(0.1, 0.25, 0.5, 0.75, 0.9)) 
+sd(price) 
+kurtosis(price)
+skewness(price)
+@
+
+Minimalna cena diamentu to 326 USD a maksymalna to 18823. Średnio to 2441 USD.
+Współczynnik asymetrii ma wartość dodatnią, zatem mamy do czynienia z rozkładem prawostronnie (dodatnio) skośnym,
+natomiast współczycnnik wyostrzenia (Kurt(X) - 3) jest ujemny, co oznacza rozkład spłaszczony (platykurtyczny).
+90\% diamentów za cenę poniżej 9821 USD.
+
+
+<<label=price_boxpl, fig=TRUE >>=
+boxplot(price, 
+        main="Boxplot for variable 'price' ",
+        col = "#009999",
+        border = "#0b6774",
+        notch=TRUE)
+@
+
+
+
+\newpage
+
+\subsubsection {Zmienna 'carat'}
+
+
+<<fig=TRUE>>=
+hist(carat, breaks = 50, main="Histogram for variable 'carat' ", col="darkmagenta")
+@
+
+Na podstawie histogramu można zauważyć, iż częściej występują diamenty o mniejszej wadze.
+
+
+<<>>=
+range(carat)
+median(carat)
+mean(carat)
+quantile(carat, c(0.1, 0.25, 0.5, 0.75, 0.9)) 
+sd(carat) 
+kurtosis(carat)
+skewness(carat)
+@
+
+Minimalna waga diamentu w analizowanych danych to 0.20 karatu, a maksymalna 5.01. Średnia wynosi 0.7.
+Współczynnik asymetrii ma wartość dodatnią, zatem mamy do czynienia z rozkładem prawostronnie (dodatnio) skośnym,
+natomiast współczycnnik wyostrzenia jest ujemny, co oznacza rozkład spłaszczony (platykurtyczny).
+90\% diamentów ma wagę mniejszą niż 1.51 karatów.
+
+
+<<fig=TRUE>>=
+boxplot(carat, 
+        main="Boxplot for variable 'carat' ",
+        col = "#009999",
+        border = "#0b6774",
+        notch=TRUE)
+
+@
+
+\subsubsection{ Zmienna 'table'}
+
+
+<<fig=TRUE>>=
+hist(table_var, breaks = 50, main="Histogram for variable 'table_var' ", col="darkmagenta")
+@
+
+Z histogramu wynika, iż wartości zmiennej 'table' skupiają się pomiędzy 50 a 70.
+
+<<>>=
+range(table_var)
+median(table_var)
+mean(table_var)
+quantile(table_var, c(0.1, 0.25, 0.5, 0.75, 0.9)) 
+sd(table_var) 
+kurtosis(table_var)
+skewness(table_var)
+@
+Minimalna wartość zmiennej 'table' w analizowanych danych to 43, a maksymalna 95. Średnia wynosi 57.
+Współczynnik asymetrii ma wartość dodatnią, zatem mamy do czynienia z rozkładem prawostronnie (dodatnio) skośnym,
+natomiast współczycnnik wyostrzenia jest ujemny, co oznacza rozkład spłaszczony (platykurtyczny).
+90\% diamentów ma współczynnik 'table' mniejszy niż 60.
+
+<<fig=TRUE>>=
+boxplot(table_var, 
+        main="Boxplot for variable 'table_var' ",
+        col = "#009999",
+        border = "#0b6774",
+        notch=TRUE)
+@
+
+
+
+\subsubsection {Zmienna 'depth'}
+
+<<fig=TRUE>>=
+hist(depth, breaks = 50, main="Histogram for variable 'depth' ", col="darkmagenta")
+@
+
+Z histogramu wynika, iż wartości zmiennej 'depth' skupiają się pomiędzy 55 a 70.
+
+<<>>=
+
+range(depth)
+median(depth)
+mean(depth)
+quantile(depth, c(0.1, 0.25, 0.5, 0.75, 0.9)) 
+sd(depth) 
+kurtosis(depth)
+skewness(depth)
+@
+
+Minimalna wartość zmiennej 'depth' w analizowanych danych to 43, a maksymalna 79. Średnia wynosi 62.
+Współczynnik asymetrii ma wartość ujemną, zatem mamy do czynienia z rozkładem lewostronnie (ujemnie) skośnym,
+natomiast współczycnnik wyostrzenia jest dodatni, co oznacza rozkład wysmukły (leptokurtyczny).
+90\% diamentów ma współczynnik 'depth' mniejszy niż 63.3.
+
+
+<<fig=TRUE>>=
+boxplot(depth, 
+        main="Boxplot for variable 'depth' ",
+        col = "#009999",
+        border = "#0b6774",
+        notch=TRUE)
+
+@
+
+
+
+\subsubsection {Zmienna 'x'}
+
+
+<<fig=TRUE>>=
+hist(x_corr, breaks = 50, main="Histogram for variable 'x_corr' ", col="darkmagenta")
+
+range(x_corr)
+median(x_corr)
+mean(x_corr)
+quantile(x_corr, c(0.1, 0.25, 0.5, 0.75, 0.9)) 
+sd(x_corr) 
+kurtosis(x_corr)
+skewness(x_corr)
+@
+
+Z histogramu wynika, iż wartości zmiennej 'x' skupiają się pomiędzy 4 a 9 mm.
+Minimalna wartość zmiennej 'x' w analizowanych danych to 0.0, a maksymalna 31.8 mm. Średnia wynosi 3.54.
+Współczynnik asymetrii ma wartość dodatnią, zatem mamy do czynienia z rozkładem prawostronnie skośnym,
+natomiast współczycnnik wyostrzenia jest ujemny, co oznacza rozkład spłaszczony.
+90\% diamentów ma wartość 'x' mniejszą niż 4.52.
+
+
+
+\subsubsection {Zmienna 'y'}
+
+
+<<fig=TRUE>>=
+
+hist(y_corr, breaks = 50, main="Histogram for variable 'y_corr' ", col="darkmagenta")
+
+range(y_corr)
+median(y_corr)
+mean(y_corr)
+quantile(y_corr, c(0.1, 0.25, 0.5, 0.75, 0.9)) 
+sd(y_corr) 
+kurtosis(y_corr)
+skewness(y_corr)
+@
+
+Z histogramu wynika, iż wartości zmiennej 'y' skupiają się pomiędzy 4 a 10 mm.
+Minimalna wartość zmiennej 'y' w analizowanych danych to 0.0, a maksymalna 58.9 mm. Średnia wynosi 5.73.
+Współczynnik asymetrii ma wartość dodatnią, zatem mamy do czynienia z rozkładem prawostronnie skośnym,
+natomiast współczycnnik wyostrzenia jest dodatni, co oznacza rozkład wysmukły.
+90\% diamentów ma wartość 'y' mniejszą niż 7.3.\\ \\
+
+
+\subsubsection {Zmienna 'z'}
+
+
+<<fig=TRUE>>=
+hist(z_corr, breaks = 50, main="Histogram for variable 'z_corr' ", col="darkmagenta")
+
+range(z_corr)
+median(z_corr)
+mean(z_corr)
+quantile(z_corr, c(0.1, 0.25, 0.5, 0.75, 0.9)) 
+sd(z_corr) 
+kurtosis(z_corr)
+skewness(z_corr)
+@
+
+Z histogramu wynika, iż wartości zmiennej 'z' skupiają się pomiędzy 3 a 7 mm.
+Minimalna wartość zmiennej 'z' w analizowanych danych to 0.0, a maksymalna 31.8 mm. Średnia wynosi 3.54.
+Współczynnik asymetrii ma wartość dodatnią, zatem mamy do czynienia z rozkładem prawostronnie skośnym,
+natomiast współczycnnik wyostrzenia jest dodatni, co oznacza rozkład wysmukły.
+90\% diamentów ma wartość 'z' mniejszą niż 4.52.
+
+
+\subsubsection {Boxplot dla zmiennych x, y, z}
+
+<<fig=TRUE>>=
+boxplot(x_corr, y_corr, z_corr, main = "Boxplot for dimensions x, y, z", ylim=c(0,15),
+        at = c(1,2,3),
+        names = c("x","y","z"),
+        col = c("#2e4dbf", "#09217b", "#1169ae"),
+        notch = TRUE
+        )
+@
+
+\subsection {Analiza rodzaju rozkładu badanych cech}
+
+Dla wybranych zmiennych wygenerowano wykres qqnorm oraz przeprowadzono test Andersona-Darlinga (ad.test) w celu porównania badanego rozkładu z rozkładem normalnym.
+Dla zmiennych z rozkładu normalnego wykres qqnorm jest linią zbliżoną do prostej, o wzorze y=x, natomiast o wyniku testu Andersona-Darlinga decyduje p-wartość.
+
+
+\subsubsection{Zmienna 'price'}
+
+Sprawdzono zgodność rozkładu zmiennej 'price' z rozkładem normalnym.
+<<fig=TRUE>>=
+qqnorm(price, pch=19,  col ="#669999") 
+ad.test(price)
+@
+
+Rozkład punktów nie jest zbliżony do wykresu prostej y=x, a p-wartość jest bardzo mała, co świadczy o fakcie, że rozkład zmiennej 'price' nie jest rozkładem normalnym.
+
+
+\subsubsection{Zmienna 'carat'}
+<<fig=TRUE>>=
+qqnorm(carat, pch=19,  col ="#669999") 
+ad.test(carat)
+@
+
+Rozkład punktów nie jest zbliżony do wykresu prostej y=x, a p-wartość jest bardzo mała, co świadczy o fakcie, że rozkład zmiennej 'carat' również nie jest rozkładem normalnym.
+
+
+
+\subsubsection{Badanie zgodności dwóch rozkładów}
+
+Sprawdzono jak bardzo zgodne są rozkłady wymiarów x i y. W tym celu wykorzystano qqplot.
+
+<<fig=TRUE>>=
+qqplot(x_corr, y_corr,  pch = 18, cex =2, col ="#69b3a2", ylim=c(0,11), xlim=c(0,11))
+lines(x_corr, x_corr, type="l", col="#427e09")
+@
+
+Na postawie wykresu można stwierdzić, że obie zmienne pochodzą z tego samego rozkładu, ponieważ punkty układają się blisko prostej y=x.
+\\ \\
+
+Następnie porównano rozkłady zmiennych 'table' i 'depth', których rozkłady również okazały się podobne, jednak nie tak bardzo jak zmiennych x i y.
+
+<<fig=TRUE>>=
+qqplot(table_var, depth,  pch = 18, cex =2, col ="#69b3a2", xlim=c(40,90), ylim = c(40,90))
+lines(table_var, table_var, type="l", col="#427e09")
+@
+
+
+
+\subsection{Testowanie hipotez}
+
+Zmienna 'depth' ma rozkład najbliższy rozkładowi normalnemu, dlatego też dla niej przeprowadzono sprawdzanie hipotez.
+
+<<fig=TRUE>>=
+m <- mean(depth)
+s <- sd(depth)
+sd_depth <- ((depth-m)/s)
+hist(sd_depth, breaks=100)
+plot(density(sd_depth), main="Density for standarized variable 'depth'")
+@
+
+\subsubsection{Testowanie hipotez dla zmiennej 'depth'}
+
+Do testowania hipotez użyto t.testu. \\
+
+Na początek przyjęto hipotezę zerową równą 2 i sprawdzono czy może być średnią. \\
+<<>>=
+t.test(sd_depth, mu = 2, alternative = "less")
+@
+p-wartość okazała się mała, zatem przyjęto hipotezę alternatywną: prawdziwa średnia jest mniejsza niż 2. \\
+
+Sprawdzono, zatem mu = 1 i powtórzono operację. \\
+<<>>=
+t.test(sd_depth, mu = 1, alternative = "less" )
+@
+p-wartość znów okazała się mała, zatem przyjęto hipotezę alternatywną: prawdziwa średnia jest mniejsza niż 1.
+I sprawdzono wynik dla mu=0. \\
+<<>>=
+t.test(sd_depth, mu = 0 )
+@
+
+p-wartość w tym przypadku okazała się wysoka, zatem nie ma podstaw by twierdzidzić, żę średnia jest różna od 0.
+
+
+\subsection{Analiza zależności pomiędzy zmiennymi}
+
+Wygenerowano macierz kowariancji dla wszystkich zmiennych.
+<<>>=
+cov(data_set[,c(1,2,3,4,5,6,7)])
+@
+
+A następnie macierz korelacji wszyskich zmiennych.
+<<fig=TRUE>>=
+cor(data_set[,c(1,2,3,4,5,6,7)])
+ggcorr(data_set[,c(1,2,3,4,5,6,7)])
+@
+
+Na podstawie uzyskanych danych, stwierdzono istnienie silnej korelacji dodatniej pomiędzy carat a price, 
+a także pomiędzy wszystkimi 3 wymiarami diamentu a carat i price. \\
+Pomiędzy 'depth' a 'table' występuje ujemna korelacja o współczynniku równym -0.3169. \\ \\
+
+
+\newpage
+\subsubsection{Zależność między 'carat' a 'price'}
+
+Wygenerowano wykres zależności price od carat.
+
+<<fig=TRUE>>=
+plot(carat, price, pch = 18, cex =1, col ="#69b3a2" )
+@
+
+Wykres wkazał istnienie zależności liniowej pomiędzy zmiennymi, zatem w następnym kroku dopasowano prostą regresji do danych.
+
+<<fig=TRUE>>=
+lm.price = lm(price~carat)
+summary(lm.price)
+
+beta0 <- coef(lm.price)[1]
+beta1 <- coef(lm.price)[2]
+plot(carat, price, pch = 18, cex =1, col ="#69b3a2" )
+lines (carat, beta0 + beta1*carat,  col="#427e09")
+@
+
+
+I porównano 95\% przedziały ufności dla carat równego 1, 2, 3 i 4.
+<<>>=
+
+newdata = data.frame(carat=1)
+p1 <- predict(lm.price, newdata, interval = "confidence", level = 0.95 )
+p1
+p1[3]-p1[2]
+
+
+newdata = data.frame(carat=2)
+p1 <- predict(lm.price, newdata, interval = "confidence", level = 0.95 )
+p1
+p1[3]-p1[2]
+
+newdata = data.frame(carat=3)
+p1 <- predict(lm.price, newdata, interval = "confidence", level = 0.95 )
+p1
+p1[3]-p1[2]
+
+newdata = data.frame(carat=4)
+p1 <- predict(lm.price, newdata, interval = "confidence", level = 0.95 )
+p1
+p1[3]-p1[2]
+
+
+@
+
+Na koniec wygenerowano wykres przedstawiający różnicę pomiędzy dopasowanymi a zaobserwowanymi wartościami (pozioma linia oznacza wartość dopasowaną).
+
+<<fig=TRUE>>=
+res.price <- resid(lm.price)
+
+plot(carat, res.price, pch = 18, cex =1, col ="#69b3a2" )
+lines(carat, y=rep(0, length(carat)) ,col="#427e09")
+
+@
+
+Analizując powyższy wykres, można zauważyć, że różnice pomiędzy wartościami dopasowanymi a rzeczywistymi są dosyć duże, co świadczy o niedokładności modelu.
+
+Na podstawie analizy wykresów i uzyskanych długości przedziałów, można stwierdzić, że uzyskany model jest dokładniejszy dla mniejszych wartości 'carat'
+(co jest spowodowane faktem, że większość wyników dotyczy właśnie mniejszych diamentów), jednak w ogólnym przypadku model nie jest wystarczająco dokładny.
+
+
+\newpage
+\subsubsection{Zależność między 'price' a 'depth' }
+
+<<fig=TRUE>>=
+plot(depth, price, pch = 18, cex =1, col ="#69b3a2" )
+@
+
+Na podstawie wykresu rozrzutu można stwierdzić, że pomiędzy 'price' a 'depth' nie ma zależności liniowej.
+\newpage
+\subsubsection{Zależność między 'depth' a 'table' }
+
+
+<<fig=TRUE>>=
+plot(depth, table_var, pch = 18, cex =1, col ="#69b3a2" )
+@
+
+Na podstawie wykresu rozrzutu można stwierdzić, że pomiędzy 'table' a 'depth' nie ma zależności liniowej.
+
+\newpage
+\subsubsection{Zależność między x i y}
+
+<<fig=TRUE>>=
+plot(x_corr, y_corr, pch = 18, cex =1, col ="#69b3a2", ylim=c(0,11) )
+@
+
+Analiza wykresu wskazuje na istnienie silnej zależności liniowej pomiędzy zmiennymi, zatem w następnym kroku dopasowano prostą regresji do danych.
+
+
+<<fig=TRUE>>=
+lm.y = lm(y_corr~x_corr)
+summary(lm.y)
+beta0 <- coef(lm.y)[1]
+beta1 <- coef(lm.y)[2]
+
+plot(x_corr, y_corr, pch = 18, cex =1, col ="#69b3a2", ylim=c(0,11) )
+lines (x_corr, beta0 + beta1*x_corr,  col="#427e09")
+
+@
+
+
+I porównano 95\% przedziały ufności dla x równego 1, 3, 5 i 7.
+
+<<>>=
+newdata = data.frame(x_corr=1)
+p1 <- predict(lm.y, newdata, interval = "confidence", level = 0.95 )
+p1
+p1[3]-p1[2]
+
+
+newdata = data.frame(x_corr=3)
+p1 <- predict(lm.y, newdata, interval = "confidence", level = 0.95 )
+p1
+p1[3]-p1[2]
+
+newdata = data.frame(x_corr=5)
+p1 <- predict(lm.y, newdata, interval = "confidence", level = 0.95 )
+p1
+p1[3]-p1[2]
+
+newdata = data.frame(x_corr=7)
+p1 <- predict(lm.y, newdata, interval = "confidence", level = 0.95 )
+p1
+p1[3]-p1[2]
+@
+
+Na koniec wygenerowano jeszcze wykres przedstawiający różnicę pomiędzy dopasowanymi a zaobserwowanymi wartościami (pozioma linia oznacza wartość dopasowaną).
+
+<<fig=TRUE>>=
+res.y <- resid(lm.y)
+plot(x_corr, res.y, pch = 18, cex =1, col ="#69b3a2" , ylim=c(-1,1))
+lines(x_corr, y=rep(0, length(x_corr)) ,col="#427e09")
+@
+
+Większość wartości na wykresie jest skupiona wzdłuż prostej y=0, co świadczy o tym, że błąd dopasowania nie jest duży.
+
+
+\section{Wnioski}
+Wnioski płynące z przeprowadzonej analizy, są następujące:
+\begin{itemize}
+\item pomiędy wagą a ceną diamentu istnieje zależność liniowa - im większy diament, tym jest on droższy,
+\item pomiędzy szerokością i długością diamentu istnieje silna zależność liniowa, co może wynikać z faktu, iż wszystkim sprzedawanym diamentom nadaje się podoby kształt,
+\item rozkłady zmiennych x i y są zgodne,
+\item zmienna 'depth' ma rozkład najbliższy rozkładowi normalnemu (spośród rozważanych zmiennych),
+\item istnieje silna korelacja dodatnia pomiędzy ceną diamentu a jego wymiarami, a także pomiędzy wagą diamanetu i jego wymiarami,
+\item ujemną korelację zaobserwowano dla zmiennych 'depth' i 'table'.
+\end{itemize}
+
+\end{document}
